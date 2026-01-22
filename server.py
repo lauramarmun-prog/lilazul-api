@@ -43,16 +43,24 @@ def db():
 
 app = FastAPI()
 
-# ✅ CORS (UNA sola vez)
-# - allow_origins=["*"] está bien para desarrollo
-# - allow_credentials=False recomendado si usas "*"
+# CORS: permite que tu web (Netlify) y tu localhost puedan llamar a la API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "https://luxury-begonia-2136b4.netlify.app",
+        # Si luego cambias de dominio en Netlify, acuérdate de añadir el nuevo aquí
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def root():
+    return {"ok": True, "msg": "Lilazul API online 💜"}
+
 
 init_db()
 
@@ -183,4 +191,3 @@ def delete_crochet(item_id: int):
     con.commit()
     con.close()
     return {"ok": True}
-
