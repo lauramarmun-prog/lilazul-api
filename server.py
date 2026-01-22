@@ -46,11 +46,12 @@ app = FastAPI()
 # CORS: permite que tu web (Netlify) y tu localhost puedan llamar a la API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "https://luxury-begonia-2136b4.netlify.app",
-        # Si luego cambias de dominio en Netlify, acuérdate de añadir el nuevo aquí
+ allow_origins=[
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "https://luxury-begonia-2136b4.netlify.app",
+    "https://magnificent-panda-edbec6.netlify.app",
+],
     ],
     allow_credentials=False,
     allow_methods=["*"],
