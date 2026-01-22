@@ -1,0 +1,12 @@
+{
+  "name": "Lilazul App",
+  "short_name": "Lilazul",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1020",
+  "theme_color": "#b7a8ff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

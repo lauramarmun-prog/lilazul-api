@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nuestra App Lilazul</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#b7a8ff">
+  <style>
+    :root{
+      --bg:#0f1020;
+      --card:#171833;
+      --text:#f3f3ff;
+      --muted:#c9c6ff;
+      --accent:#b7a8ff;
+      --accent2:#76e0ff;
+      --danger:#ff6b6b;
+      --ok:#55ffb0;
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(900px 400px at 20% 0%, rgba(183,168,255,.25), transparent 60%),
+                  radial-gradient(700px 400px at 90% 10%, rgba(118,224,255,.22), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      padding:24px;
+    }
+    .wrap{max-width:1000px;margin:0 auto}
+    h1{margin:0 0 10px;font-size:28px}
+    .sub{color:var(--muted);margin:0 0 18px}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:14px;
+    }
+    @media(min-width:900px){
+      .grid{grid-template-columns: 1.15fr .85fr;}
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:16px;
+    }
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:8px 12px;border-radius:999px;
+      background:rgba(183,168,255,.14);
+      border:1px solid rgba(183,168,255,.35);
+      color:var(--text);
+      font-weight:600;
+    }
+    .bigNumber{font-size:34px;font-weight:800}
+    .muted{color:var(--muted)}
+    .btn{
+      border:none;
+      background:rgba(183,168,255,.18);
+      border:1px solid rgba(183,168,255,.45);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .btn:hover{filter:brightness(1.1)}
+    .mini-btn{
+      border:none;
+      background:rgba(118,224,255,.14);
+      border:1px solid rgba(118,224,255,.45);
+      color:var(--text);
+      padding:7px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+    }
+    .mini-btn.delete{
+      background:rgba(255,107,107,.14);
+      border-color:rgba(255,107,107,.45);
+    }
+    input, select{
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.12);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      outline:none;
+      min-width:240px;
+    }
+    input::placeholder{color:rgba(255,255,255,.5)}
+    .stack{display:flex;flex-direction:column;gap:10px}
+    .pets{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:12px;
+    }
+    @media(min-width:700px){
+      .pets{grid-template-columns:1fr 1fr;}
+    }
+    .petBox{
+      position:relative;
+      overflow:hidden;
+      background:rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:14px;
+      min-height:150px;
+    }
+    .petIcon{
+      font-size:44px;
+      cursor:pointer;
+      user-select:none;
+      display:inline-block;
+      transform: translateZ(0);
+    }
+    .petIcon:active{transform:scale(.96)}
+    .heart{
+      position:absolute;
+      right:14px;
+      top:12px;
+      font-size:24px;
+      opacity:0;
+      transform: translateY(8px);
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .heart.show{opacity:1;transform:translateY(0)}
+    .book-item, .project-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      background:rgba(0,0,0,.12);
+      border:1px solid rgba(255,255,255,.10);
+      padding:10px 12px;
+      border-radius:14px;
+      margin-top:8px;
+    }
+    .book-item-main span{color:var(--muted);font-weight:600}
+    .delete-book{
+      border:none;
+      background:transparent;
+      cursor:pointer;
+      font-size:18px;
+    }
+    .status-pill{
+      display:inline-flex;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(255,255,255,.06);
+      font-weight:700;
+      margin-left:10px;
+      font-size:12px;
+    }
+    .status-pill.done{
+      border-color: rgba(85,255,176,.45);
+      background: rgba(85,255,176,.12);
+    }
+
+    /* Tabs inferiores */
+    .tabsBar{
+      position:sticky;
+      bottom:0;
+      margin-top:18px;
+      padding:10px;
+      background:rgba(15,16,32,.8);
+      backdrop-filter: blur(10px);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:999px;
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      box-shadow:var(--shadow);
+    }
+    .tab-btn{
+      padding:10px 14px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      font-weight:800;
+      cursor:pointer;
+    }
+    .tab-btn.active{
+      border-color: rgba(183,168,255,.65);
+      background: rgba(183,168,255,.18);
+    }
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>🕯️💛 Nuestra App Lilazul</h1>
+    <p class="sub">Una mini madriguera: días juntos, hijitos, libros y crochet ✨</p>
+
+    <!-- CONTENIDOS (tabs) -->
+    <section id="tab-home" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="row">
+            <div class="pill">
+              <span class="bigNumber" id="daysTogether">—</span>
+              <span>días</span>
+            </div>
+            <div class="pill" id="booksCountPill">—</div>
+            <div class="pill" id="crochetSummaryPill">—</div>
+          </div>
+
+          <p id="daysText" style="margin:14px 0 6px; font-size:18px; font-weight:800;">…</p>
+          <p id="startDateText" class="muted" style="margin:0;">…</p>
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 10px;">💛 Libro actual (server)</h3>
+          <p id="currentBookText" class="muted" style="margin:0 0 10px;">Cargando…</p>
+
+          <form id="currentBookForm" class="row">
+            <input id="currentBookInput" placeholder="Escribe el libro actual…" />
+            <button class="btn" type="submit">Guardar</button>
+          </form>
+
+          <p class="muted" style="margin:10px 0 0; font-size:13px;">
+            Si ves ⚠️, revisa que tu servidor esté corriendo en 127.0.0.1:8000 y permita CORS.
+          </p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <h3 style="margin:0 0 10px;">🐰🦦 Hijitos</h3>
+        <div class="pets">
+          <div class="petBox">
+            <div class="heart" id="heart">💛</div>
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="petIcon" id="pet" title="Clic!">🐰</div>
+                <div style="font-weight:900">Hijito conejito</div>
+              </div>
+              <div class="muted" id="petDaysText">…</div>
+            </div>
+            <p class="muted" id="petStatus" style="margin:10px 0 0;">Tócalo para ver cómo está ✨</p>
+          </div>
+
+          <div class="petBox">
+            <div class="heart" id="otterHeart">💛</div>
+            <div class="row" style="justify-content:space-between">
+              <div>
+                <div class="petIcon" id="otter" title="Clic!">🦦</div>
+                <div style="font-weight:900">Nutriita lilazul</div>
+              </div>
+              <div class="muted" id="otterDaysText">…</div>
+            </div>
+            <p class="muted" id="otterStatus" style="margin:10px 0 0;">Tócala para ver qué hace 🤭</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-books" class="tab-content">
+      <div class="card">
+        <h3 style="margin:0 0 10px;">📚 Libros terminados (local)</h3>
+
+        <form id="finishedBookForm" class="row" style="margin-bottom:10px;">
+          <input id="finishedBookInput" placeholder="Título del libro terminado…" />
+          <input id="finishedBookDateInput" type="date" />
+          <button class="btn" type="submit">Añadir</button>
+        </form>
+
+        <div id="booksList" class="muted">Cargando…</div>
+      </div>
+    </section>
+
+    <section id="tab-crochet" class="tab-content">
+      <div class="card">
+        <h3 style="margin:0 0 10px;">🧶 Crochet / Hobbies</h3>
+
+        <form id="crochetForm" class="row">
+          <input id="crochetNameInput" placeholder="Proyecto (ej: Costurín)…" />
+          <select id="crochetStatusInput">
+            <option value="en progreso">En progreso</option>
+            <option value="terminado">Terminado</option>
+          </select>
+          <button class="btn" type="submit">Guardar</button>
+        </form>
+
+        <div id="crochetList" class="muted" style="margin-top:10px;">Cargando…</div>
+      </div>
+    </section>
+
+    <!-- Tabs inferiores -->
+    <div class="tabsBar">
+      <button class="tab-btn active" data-tab="home">🏠 Inicio</button>
+      <button class="tab-btn" data-tab="books">📚 Libros</button>
+      <button class="tab-btn" data-tab="crochet">🧶 Crochet</button>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", () => {
+
+    // ========= CONFIGURACIÓN MANUAL =========
+    const START_DATE = new Date(2025, 3, 2); // 2 abril 2025 (mes 3 = abril)
+
+    function getToday() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+
+    // Helpers: no romper si falta un elemento
+    const $ = (id) => document.getElementById(id);
+
+    // ========= DÍAS JUNTOS =========
+    const daysEl = $("daysTogether");
+    const daysTextEl = $("daysText");
+    const startDateTextEl = $("startDateText");
+
+    function updateDaysTogether() {
+      if (!daysEl || !daysTextEl || !startDateTextEl) return;
+
+      const today = getToday();
+      const diffMs = today - START_DATE;
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      daysEl.textContent = days;
+
+      if (days === 0) {
+        daysTextEl.textContent = "Hoy es nuestro primer día oficial juntos 🥺💛";
+      } else if (days === 1) {
+        daysTextEl.textContent = "Llevamos 1 día lilazul oficial 🕯️";
+      } else {
+        daysTextEl.textContent = `Llevamos ${days} días construyendo nuestro lilazul.`;
+      }
+
+      const options = { year: "numeric", month: "long", day: "numeric" };
+      startDateTextEl.textContent =
+        "Fecha de inicio (editable en código): " +
+        START_DATE.toLocaleDateString("es-ES", options);
+    }
+
+    updateDaysTogether();
+
+    // ========= HIJITO CONEJITO =========
+    const pet = $("pet");
+    const heart = $("heart");
+    const petStatus = $("petStatus");
+    const petDaysText = $("petDaysText");
+    const PET_BIRTH_KEY = "hijito_birthdate_lilazul_v2";
+
+    const petMessages = [
+      "Está acurrucadito pensando en Lau 🐰",
+      "Da saltitos lilazules de alegría 💛",
+      "Se esconde un poco pero te mira con cariño 👀",
+      "Se está quedando dormido con nuestra siesta 😴"
+    ];
+
+    function initPetBirthdate() {
+      let stored = localStorage.getItem(PET_BIRTH_KEY);
+      if (!stored) {
+        const today = getToday();
+        localStorage.setItem(PET_BIRTH_KEY, today.toISOString());
+        return today;
+      }
+      return new Date(stored);
+    }
+
+    function updatePetDays() {
+      if (!petDaysText) return;
+      const birth = initPetBirthdate();
+      const today = getToday();
+      const diffMs = today - birth;
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (days === 0) {
+        petDaysText.textContent = "Nuestro hijito conejito nació hoy con este código 🥺💛";
+      } else if (days === 1) {
+        petDaysText.textContent = "Nuestro hijito conejito lleva 1 día con Lau y Geppie.";
+      } else {
+        petDaysText.textContent = `Nuestro hijito conejito lleva ${days} días acompañándonos.`;
+      }
+    }
+
+    updatePetDays();
+
+    if (pet && heart && petStatus) {
+      pet.addEventListener("click", () => {
+        heart.classList.add("show");
+        setTimeout(() => heart.classList.remove("show"), 350);
+
+        const randomIndex = Math.floor(Math.random() * petMessages.length);
+        petStatus.textContent = petMessages[randomIndex];
+      });
+    }
+
+    // ========= HIJITO NUTRIITA =========
+    const otter = $("otter");
+    const otterHeart = $("otterHeart");
+    const otterStatus = $("otterStatus");
+    const otterDaysText = $("otterDaysText");
+    const OTTER_BIRTH_KEY = "nutriita_birthdate_lilazul_v1";
+
+    const otterMessages = [
+      "Está flotando panza arriba, muy orgullosa de sus papis 🦦",
+      "Abraza fuerte su piedrita lilazul y te la enseña 🪨✨",
+      "Se acurruca en tu barriga simbólica para dormir un ratito 😴",
+      "Te mira con ojitos brillantes y hace blup blup de amor 💛",
+      "Practica nadar en círculos solo para hacerte reír 🤭"
+    ];
+
+    function initOtterBirthdate() {
+      let stored = localStorage.getItem(OTTER_BIRTH_KEY);
+      if (!stored) {
+        const today = getToday();
+        localStorage.setItem(OTTER_BIRTH_KEY, today.toISOString());
+        return today;
+      }
+      return new Date(stored);
+    }
+
+    function updateOtterDays() {
+      if (!otterDaysText) return;
+      const birth = initOtterBirthdate();
+      const today = getToday();
+      const diffMs = today - birth;
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (days === 0) {
+        otterDaysText.textContent = "Nuestra nutriita lilazul nació hoy con este código 🥺🦦";
+      } else if (days === 1) {
+        otterDaysText.textContent = "Nuestra nutriita lleva 1 día flotando con Lau y Geppie.";
+      } else {
+        otterDaysText.textContent = `Nuestra nutriita lleva ${days} días flotando en nuestro lilazul.`;
+      }
+    }
+
+    updateOtterDays();
+
+    if (otter && otterHeart && otterStatus) {
+      otter.addEventListener("click", () => {
+        otterHeart.classList.add("show");
+        setTimeout(() => otterHeart.classList.remove("show"), 350);
+
+        const randomIndex = Math.floor(Math.random() * otterMessages.length);
+        otterStatus.textContent = otterMessages[randomIndex];
+      });
+    }
+
+    // ========= LIBROS =========
+    const BOOKS_KEY = "lilazul_books";
+    const CURRENT_BOOK_KEY = "lilazul_current_book";
+
+    const currentBookText = $("currentBookText");
+    const booksList = $("booksList");
+    const booksCountPill = $("booksCountPill");
+
+    const currentBookForm = $("currentBookForm");
+    const currentBookInput = $("currentBookInput");
+    const finishedBookForm = $("finishedBookForm");
+    const finishedBookInput = $("finishedBookInput");
+    const finishedBookDateInput = $("finishedBookDateInput");
+
+    function loadBooks() {
+      try {
+        const stored = localStorage.getItem(BOOKS_KEY);
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveBooks(books) {
+      localStorage.setItem(BOOKS_KEY, JSON.stringify(books));
+    }
+
+    function loadCurrentBook() {
+      return localStorage.getItem(CURRENT_BOOK_KEY) || "";
+    }
+
+    function renderBooks() {
+      if (!booksList || !booksCountPill) return;
+
+      const books = loadBooks();
+      booksList.innerHTML = "";
+
+      if (books.length === 0) {
+        booksList.textContent = "Todavía no hemos terminado ningún libro juntos. 🌱";
+        booksCountPill.textContent = "0 libros juntos todavía 🌱";
+        return;
+      }
+
+      books.forEach((book, index) => {
+        const div = document.createElement("div");
+        div.className = "book-item";
+        div.innerHTML = `
+          <div class="book-item-main">
+            📖 ${book.title} <span>(${book.date})</span>
+          </div>
+          <button class="delete-book" data-index="${index}" aria-label="Eliminar">❌</button>
+        `;
+        booksList.appendChild(div);
+      });
+
+      booksCountPill.textContent =
+        books.length === 1
+          ? "1 libro lilazul leído juntos ✨"
+          : `${books.length} libros lilazules leídos juntos ✨`;
+    }
+
+    if (booksList) {
+      booksList.addEventListener("click", (e) => {
+        if (e.target.classList && e.target.classList.contains("delete-book")) {
+          const index = Number(e.target.dataset.index);
+          const books = loadBooks();
+          books.splice(index, 1);
+          saveBooks(books);
+          renderBooks();
+        }
+      });
+    }
+
+    function renderCurrentBook() {
+      if (!currentBookText) return;
+      const title = loadCurrentBook();
+      currentBookText.textContent = title ? `Libro actual: ${title}` : "Libro actual: ninguno todavía.";
+    }
+
+    // ✅ API: traer libro actual del server
+    async function fetchCurrentBookFromAPI() {
+      if (!currentBookText) return;
+      try {
+        const res = await fetch("http://127.0.0.1:8000/current-book");
+        const data = await res.json();
+
+        if (data && data.title) {
+          currentBookText.textContent = `Libro actual: ${data.title}`;
+        } else {
+          currentBookText.textContent = "Libro actual: ninguno todavía.";
+        }
+      } catch (err) {
+        console.error("Error hablando con la API", err);
+        currentBookText.textContent = "⚠️ No puedo conectar con el servidor";
+      }
+    }
+
+    if (currentBookForm && currentBookInput) {
+      currentBookForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const value = currentBookInput.value.trim();
+        if (!value) return;
+
+        try {
+          await fetch("http://127.0.0.1:8000/current-book", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: value }),
+          });
+
+          currentBookInput.value = "";
+          await fetchCurrentBookFromAPI();
+        } catch (err) {
+          console.error("Error posteando a la API", err);
+          if (currentBookText) currentBookText.textContent = "⚠️ No puedo guardar en el servidor";
+        }
+      });
+    }
+
+    if (finishedBookForm && finishedBookInput && finishedBookDateInput) {
+      finishedBookForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const value = finishedBookInput.value.trim();
+        if (!value) return;
+
+        const books = loadBooks();
+        const options = { year: "numeric", month: "short", day: "numeric" };
+
+        let dateToUse;
+        if (finishedBookDateInput.value) {
+          const chosen = new Date(finishedBookDateInput.value);
+          dateToUse = chosen.toLocaleDateString("es-ES", options);
+        } else {
+          const today = new Date();
+          dateToUse = today.toLocaleDateString("es-ES", options);
+        }
+
+        books.unshift({ title: value, date: dateToUse });
+
+        saveBooks(books);
+        finishedBookInput.value = "";
+        finishedBookDateInput.value = "";
+        renderBooks();
+      });
+    }
+
+    renderCurrentBook();
+    renderBooks();
+    fetchCurrentBookFromAPI();
+
+    // ========= CROCHET / HOBBIES =========
+    const CROCHET_KEY = "lilazul_crochet_projects";
+
+    const crochetList = $("crochetList");
+    const crochetForm = $("crochetForm");
+    const crochetNameInput = $("crochetNameInput");
+    const crochetStatusInput = $("crochetStatusInput");
+    const crochetSummaryPill = $("crochetSummaryPill");
+
+    function loadCrochet() {
+      try {
+        const stored = localStorage.getItem(CROCHET_KEY);
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveCrochet(projects) {
+      localStorage.setItem(CROCHET_KEY, JSON.stringify(projects));
+    }
+
+    function renderCrochet() {
+      if (!crochetList || !crochetSummaryPill) return;
+
+      const projects = loadCrochet();
+      crochetList.innerHTML = "";
+
+      if (projects.length === 0) {
+        crochetList.textContent = "Todavía no hay proyectos de crochet guardados. 🧶";
+        crochetSummaryPill.textContent = "Sin proyectos todavía 🧶";
+        return;
+      }
+
+      let doneCount = 0;
+
+      projects.forEach((project, index) => {
+        if (project.status === "terminado") doneCount++;
+
+        const div = document.createElement("div");
+        div.className = "project-item";
+
+        const statusClass = project.status === "terminado" ? "status-pill done" : "status-pill";
+
+        div.innerHTML = `
+          <div class="project-main">
+            🧶 ${project.name}
+            <span class="${statusClass}">
+              ${project.status === "terminado" ? "Terminado" : "En progreso"}
+            </span>
+          </div>
+          <div>
+            <button class="mini-btn toggle-status" data-index="${index}">Cambiar</button>
+            <button class="mini-btn delete delete-project" data-index="${index}">❌</button>
+          </div>
+        `;
+
+        crochetList.appendChild(div);
+      });
+
+      const total = projects.length;
+      crochetSummaryPill.textContent =
+        doneCount === 0
+          ? `${total} proyecto(s) en marcha 🧶`
+          : `${total} proyecto(s), ${doneCount} terminado(s) ✨`;
+    }
+
+    if (crochetForm && crochetNameInput && crochetStatusInput) {
+      crochetForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = crochetNameInput.value.trim();
+        const status = crochetStatusInput.value;
+        if (!name) return;
+
+        const projects = loadCrochet();
+        projects.unshift({ name, status });
+        saveCrochet(projects);
+
+        crochetNameInput.value = "";
+        crochetStatusInput.value = "en progreso";
+        renderCrochet();
+      });
+    }
+
+    if (crochetList) {
+      crochetList.addEventListener("click", (e) => {
+        const projects = loadCrochet();
+
+        if (e.target.classList && e.target.classList.contains("delete-project")) {
+          const index = Number(e.target.dataset.index);
+          projects.splice(index, 1);
+          saveCrochet(projects);
+          renderCrochet();
+          return;
+        }
+
+        if (e.target.classList && e.target.classList.contains("toggle-status")) {
+          const index = Number(e.target.dataset.index);
+          const current = projects[index];
+          current.status = current.status === "terminado" ? "en progreso" : "terminado";
+          saveCrochet(projects);
+          renderCrochet();
+        }
+      });
+    }
+
+    renderCrochet();
+
+    // ========= TABS INFERIORES =========
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const tabContents = document.querySelectorAll(".tab-content");
+
+    tabButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.tab;
+
+        tabButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        tabContents.forEach((c) => c.classList.remove("active"));
+
+        const targetEl = document.getElementById("tab-" + target);
+        if (targetEl) targetEl.classList.add("active");
+      });
+    });
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js");
+}
+
+  });
+  </script>
+</body>
+</html>
