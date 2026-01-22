@@ -38,25 +38,32 @@ def init_db():
 
 
 def db():
-    return sqlite3.connect(DB)
+    # check_same_thread False ayuda a evitar algunos líos con sqlite en servidores
+    return sqlite3.connect(DB, check_same_thread=False)
 
 
 app = FastAPI()
 
-# CORS: permite que tu web (Netlify) y tu localhost puedan llamar a la API
-app.add_middleware(
-    CORSMiddleware,
-allow_origins=[
+ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
     "https://luxury-begonia-2136b4.netlify.app",
     "https://magnificent-panda-edbec6.netlify.app",
-],
- 
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 👇 útil para probar CORS rápido
+@app.get("/ping")
+def ping():
+    return {"ok": True, "msg": "pong 💜"}
+
 
 @app.get("/")
 def root():
@@ -175,7 +182,7 @@ def toggle_crochet(item_id: int):
 
     if not row:
         con.close()
-        return {"ok": False}
+        return {"ok": False, "error": "not_found"}
 
     new_status = "terminado" if row[0] != "terminado" else "en progreso"
     cur.execute("UPDATE crochet SET status=? WHERE id=?", (new_status, item_id))
@@ -192,3 +199,4 @@ def delete_crochet(item_id: int):
     con.commit()
     con.close()
     return {"ok": True}
+
