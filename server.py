@@ -156,54 +156,51 @@ def delete_finished_book(book_id: int):
     return {"ok": True}
 
 
-# ========= CROCHET =========
-@app.get("/crochet")
+# ========= CROCHET (SERVER) =========
+from pydantic import BaseModel
+from typing import Optional, List
+from uuid import uuid4
+
+class CrochetCreate(BaseModel):
+    title: str
+    notes: Optional[str] = ""
+    status: Optional[str] = "wip"  # "wip" o "done"
+
+class CrochetItem(CrochetCreate):
+    id: str
+
+crochet_db: List[CrochetItem] = []
+
+
+@app.get("/crochet", response_model=List[CrochetItem])
 def list_crochet():
-    con = db()
-    cur = con.cursor()
-    cur.execute("SELECT id, name, status FROM crochet ORDER BY id DESC")
-    rows = cur.fetchall()
-    con.close()
-    return [{"id": r[0], "name": r[1], "status": r[2]} for r in rows]
+    return crochet_db
 
 
-@app.post("/crochet")
-def add_crochet(payload: CrochetItem):
-    con = db()
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO crochet(name, status) VALUES(?, ?)",
-        (payload.name, payload.status),
-    )
-    con.commit()
-    con.close()
-    return {"ok": True}
+@app.post("/crochet", response_model=CrochetItem)
+def add_crochet(payload: CrochetCreate):
+    item = CrochetItem(id=str(uuid4()), **payload.model_dump())
+    crochet_db.insert(0, item)  # nuevo arriba
+    return item
 
 
-@app.patch("/crochet/{item_id}/toggle")
-def toggle_crochet(item_id: int):
-    con = db()
-    cur = con.cursor()
-    cur.execute("SELECT status FROM crochet WHERE id=?", (item_id,))
-    row = cur.fetchone()
-
-    if not row:
-        con.close()
-        return {"ok": False, "error": "not_found"}
-
-    new_status = "terminado" if row[0] != "terminado" else "en progreso"
-    cur.execute("UPDATE crochet SET status=? WHERE id=?", (new_status, item_id))
-    con.commit()
-    con.close()
-    return {"ok": True, "status": new_status}
+@app.patch("/crochet/{item_id}/toggle", response_model=CrochetItem)
+def toggle_crochet(item_id: str):
+    for i, item in enumerate(crochet_db):
+        if item.id == item_id:
+            new_status = "done" if item.status != "done" else "wip"
+            updated = item.model_copy(update={"status": new_status})
+            crochet_db[i] = updated
+            return updated
+    raise HTTPException(status_code=404, detail="Crochet item not found")
 
 
 @app.delete("/crochet/{item_id}")
-def delete_crochet(item_id: int):
-    con = db()
-    cur = con.cursor()
-    cur.execute("DELETE FROM crochet WHERE id=?", (item_id,))
-    con.commit()
-    con.close()
-    return {"ok": True}
+def delete_crochet(item_id: str):
+    for i, item in enumerate(crochet_db):
+        if item.id == item_id:
+            crochet_db.pop(i)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="Crochet item not found")
+
 
