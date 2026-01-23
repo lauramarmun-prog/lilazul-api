@@ -42,13 +42,17 @@ def db():
     return sqlite3.connect(DB, check_same_thread=False)
 
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
 
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
-    "https://luxury-begonia-2136b4.netlify.app",
     "https://magnificent-panda-edbec6.netlify.app",
+    # opcional si tienes otro deploy viejo:
+    "https://luxury-begonia-2136b4.netlify.app",
 ]
 
 app.add_middleware(
@@ -69,6 +73,9 @@ def ping():
 def root():
     return {"ok": True, "msg": "Lilazul API online 💜"}
 
+@app.get("/ping")
+def ping():
+    return {"ok": True, "cors": "enabled", "version": "2026-01-23"}
 
 init_db()
 
