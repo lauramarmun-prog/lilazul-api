@@ -3,6 +3,38 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
 
+import os
+import psycopg
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+import os
+import psycopg
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+def get_conn():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL no está configurada")
+    return psycopg.connect(DATABASE_URL)
+def init_crochet_table():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS crochet (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    notes TEXT,
+                    status TEXT NOT NULL
+                )
+            """)
+        conn.commit()app = FastAPI()
+
+app = FastAPI()
+
+init_crochet_table()
+
 DB = "lilazul.db"
 
 
@@ -44,6 +76,7 @@ def db():
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
@@ -169,38 +202,83 @@ class CrochetCreate(BaseModel):
 class CrochetItem(CrochetCreate):
     id: str
 
-crochet_db: List[CrochetItem] = []
+# crochet_db: List[CrochetItem] = []
 
 
-@app.get("/crochet", response_model=List[CrochetItem])
+
+@app.get("/crochet", response_model=list[CrochetItem])
 def list_crochet():
-    return crochet_db
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, title, notes, status FROM crochet ORDER BY rowid DESC")
+            rows = cur.fetchall()
+
+    return [
+        CrochetItem(id=r[0], title=r[1], notes=r[2] or "", status=r[3])
+        for r in rows
+    ]
+
 
 
 @app.post("/crochet", response_model=CrochetItem)
 def add_crochet(payload: CrochetCreate):
-    item = CrochetItem(id=str(uuid4()), **payload.model_dump())
-    crochet_db.insert(0, item)  # nuevo arriba
-    return item
+    item_id = str(uuid4())
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO crochet (id, title, notes, status) VALUES (%s, %s, %s, %s)",
+                (item_id, payload.title, payload.notes or "", payload.status),
+            )
+        conn.commit()
+
+    return CrochetItem(
+        id=item_id,
+        title=payload.title,
+        notes=payload.notes or "",
+        status=payload.status,
+    )
 
 
 @app.patch("/crochet/{item_id}/toggle", response_model=CrochetItem)
 def toggle_crochet(item_id: str):
-    for i, item in enumerate(crochet_db):
-        if item.id == item_id:
-            new_status = "done" if item.status != "done" else "wip"
-            updated = item.model_copy(update={"status": new_status})
-            crochet_db[i] = updated
-            return updated
-    raise HTTPException(status_code=404, detail="Crochet item not found")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT title, notes, status FROM crochet WHERE id = %s",
+                (item_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Crochet item not found")
+
+            new_status = "done" if row[2] != "done" else "wip"
+            cur.execute(
+                "UPDATE crochet SET status = %s WHERE id = %s",
+                (new_status, item_id),
+            )
+        conn.commit()
+
+    return CrochetItem(
+        id=item_id,
+        title=row[0],
+        notes=row[1] or "",
+        status=new_status,
+    )
+
 
 
 @app.delete("/crochet/{item_id}")
 def delete_crochet(item_id: str):
-    for i, item in enumerate(crochet_db):
-        if item.id == item_id:
-            crochet_db.pop(i)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Crochet item not found")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM crochet WHERE id = %s", (item_id,))
+            deleted = cur.rowcount
+        conn.commit()
+
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="Crochet item not found")
+
+    return {"ok": True}
+
 
 
