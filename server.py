@@ -33,7 +33,10 @@ def init_crochet_table():
                     status TEXT NOT NULL
                 )
             """)
-        conn.commit()app = FastAPI()
+        conn.commit()
+
+app = FastAPI()
+
 def init_state_table():
     with get_conn() as conn:
         with conn.cursor() as cur:
