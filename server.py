@@ -139,6 +139,10 @@ app.add_middleware(
 def ping():
     return {"ok": True, "msg": "pong 💜"}
 
+@app.get("/marker")
+def marker():
+    return {"marker": "SERVER_PY_NEW_123"}
+
 
 @app.get("/")
 def root():
