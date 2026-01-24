@@ -6,6 +6,10 @@ import sqlite3
 import os
 import psycopg
 
+import json
+from typing import Any
+
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,10 +34,44 @@ def init_crochet_table():
                 )
             """)
         conn.commit()app = FastAPI()
+def init_state_table():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS state (
+                    key TEXT PRIMARY KEY,
+                    value JSONB NOT NULL
+                )
+            """)
+        conn.commit()
+
+def get_state(key: str, default: Any):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value::text FROM state WHERE key = %s", (key,))
+            row = cur.fetchone()
+    if not row:
+        return default
+    return json.loads(row[0])
+
+def set_state(key: str, value: Any):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO state (key, value)
+                VALUES (%s, %s::jsonb)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                """,
+                (key, json.dumps(value)),
+            )
+        conn.commit()
 
 app = FastAPI()
 
 init_crochet_table()
+init_state_table()
+
 
 DB = "lilazul.db"
 
