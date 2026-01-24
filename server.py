@@ -168,62 +168,45 @@ class CrochetItem(BaseModel):
 # ========= CURRENT BOOK =========
 @app.get("/current-book")
 def get_current_book():
-    con = db()
-    cur = con.cursor()
-    cur.execute("SELECT value FROM state WHERE key='current_book'")
-    row = cur.fetchone()
-    con.close()
-    return {"title": row[0] if row else ""}
-
+    return get_state("current_book", {})
 
 @app.post("/current-book")
-def set_current_book(payload: CurrentBook):
-    con = db()
-    cur = con.cursor()
-    cur.execute(
-        """
-        INSERT INTO state(key,value)
-        VALUES('current_book', ?)
-        ON CONFLICT(key) DO UPDATE SET value=excluded.value
-        """,
-        (payload.title,),
-    )
-    con.commit()
-    con.close()
-    return {"ok": True}
+def set_current_book(payload: dict):
+    set_state("current_book", payload)
+    return payload
 
 
 # ========= FINISHED BOOKS =========
 @app.get("/finished-books")
 def list_finished_books():
-    con = db()
-    cur = con.cursor()
-    cur.execute("SELECT id, title, date FROM finished_books ORDER BY id DESC")
-    rows = cur.fetchall()
-    con.close()
-    return [{"id": r[0], "title": r[1], "date": r[2]} for r in rows]
+    return get_state("finished_books", [])
 
 
 @app.post("/finished-books")
-def add_finished_book(payload: FinishedBook):
-    con = db()
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO finished_books(title, date) VALUES(?, ?)",
-        (payload.title, payload.date),
-    )
-    con.commit()
-    con.close()
-    return {"ok": True}
-
+def add_finished_book(payload: dict):
+    books = get_state("finished_books", [])
+    books.insert(0, payload)
+    set_state("finished_books", books)
+    return books
 
 @app.delete("/finished-books/{book_id}")
-def delete_finished_book(book_id: int):
-    con = db()
-    cur = con.cursor()
-    cur.execute("DELETE FROM finished_books WHERE id=?", (book_id,))
-    con.commit()
-    con.close()
+@app.delete("/finished-books/{book_id}")
+def delete_finished_book(book_id: str):
+    books = get_state("finished_books", [])
+
+    new_books = []
+    removed = False
+
+    for b in books:
+        if str(b.get("id")) == str(book_id):
+            removed = True
+            continue
+        new_books.append(b)
+
+    if not removed:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    set_state("finished_books", new_books)
     return {"ok": True}
 
 
