@@ -173,7 +173,8 @@ def get_current_book():
 @app.post("/current-book")
 def set_current_book(payload: dict):
     set_state("current_book", payload)
-    return payload
+    return {"_marker": "NEW_CURRENT_BOOK", **payload}
+
 
 
 # ========= FINISHED BOOKS =========
