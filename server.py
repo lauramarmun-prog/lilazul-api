@@ -1,27 +1,58 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import sqlite3
-
-import os
-import psycopg
-
-import json
-from typing import Any
-
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
+from pydantic import BaseModel
+from typing import Any, Optional, List
 import os
+import json
 import psycopg
+from uuid import uuid4
 
+
+# =========================
+# CONFIG
+# =========================
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "https://magnificent-panda-edbec6.netlify.app",
+    # opcional si tienes otro deploy viejo:
+    "https://luxury-begonia-2136b4.netlify.app",
+]
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# =========================
+# DB helpers (Postgres / Supabase)
+# =========================
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL no está configurada")
     return psycopg.connect(DATABASE_URL)
+
+
+def init_state_table():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS state (
+                    key TEXT PRIMARY KEY,
+                    value JSONB NOT NULL
+                )
+            """)
+        conn.commit()
+
+
 def init_crochet_table():
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -35,18 +66,23 @@ def init_crochet_table():
             """)
         conn.commit()
 
-app = FastAPI()
 
-def init_state_table():
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS state (
-                    key TEXT PRIMARY KEY,
-                    value JSONB NOT NULL
-                )
-            """)
-        conn.commit()
+@app.on_event("startup")
+def on_startup():
+    """
+    Importante: NO queremos que Render se caiga si la DB falla.
+    Si falla, el server arranca igual y lo vemos en logs.
+    """
+    try:
+        init_state_table()
+    except Exception as e:
+        print("⚠️ init_state_table failed:", e)
+
+    try:
+        init_crochet_table()
+    except Exception as e:
+        print("⚠️ init_crochet_table failed:", e)
+
 
 def get_state(key: str, default: Any):
     with get_conn() as conn:
@@ -56,6 +92,7 @@ def get_state(key: str, default: Any):
     if not row:
         return default
     return json.loads(row[0])
+
 
 def set_state(key: str, value: Any):
     with get_conn() as conn:
@@ -70,138 +107,51 @@ def set_state(key: str, value: Any):
             )
         conn.commit()
 
-app = FastAPI()
 
-init_crochet_table()
-init_state_table()
-
-
-DB = "lilazul.db"
-
-
-def init_db():
-    con = sqlite3.connect(DB)
-    cur = con.cursor()
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS state (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS finished_books (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            date TEXT NOT NULL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS crochet (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            status TEXT NOT NULL
-        )
-    """)
-
-    con.commit()
-    con.close()
-
-
-def db():
-    # check_same_thread False ayuda a evitar algunos líos con sqlite en servidores
-    return sqlite3.connect(DB, check_same_thread=False)
-
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-
-app = FastAPI()
-
-ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "https://magnificent-panda-edbec6.netlify.app",
-    # opcional si tienes otro deploy viejo:
-    "https://luxury-begonia-2136b4.netlify.app",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 👇 útil para probar CORS rápido
+# =========================
+# BASIC endpoints
+# =========================
 @app.get("/ping")
 def ping():
-    return {"ok": True, "msg": "pong 💜"}
+    return {"ok": True, "msg": "pong 💜", "version": "2026-01-25"}
 
 @app.get("/marker")
 def marker():
     return {"marker": "SERVER_PY_NEW_123"}
 
-
 @app.get("/")
 def root():
     return {"ok": True, "msg": "Lilazul API online 💜"}
 
-@app.get("/ping")
-def ping():
-    return {"ok": True, "cors": "enabled", "version": "2026-01-23"}
 
-init_db()
-
-
-class CurrentBook(BaseModel):
-    title: str
-
-
-class FinishedBook(BaseModel):
-    title: str
-    date: str
-
-
-class CrochetItem(BaseModel):
-    name: str
-    status: str
-
-
-# ========= CURRENT BOOK =========
+# =========================
+# BOOKS (state table)
+# =========================
 @app.get("/current-book")
-def get_current_book():
+def api_get_current_book():
+    # {} por defecto
     return get_state("current_book", {})
 
 @app.post("/current-book")
-def set_current_book(payload: dict):
+def api_set_current_book(payload: dict):
     set_state("current_book", payload)
-    return {"_marker": "NEW_CURRENT_BOOK", **payload}
+    # devolvemos lo que guardamos (así lo ves en Swagger)
+    return payload
 
-
-
-# ========= FINISHED BOOKS =========
 @app.get("/finished-books")
-def list_finished_books():
+def api_list_finished_books():
     return get_state("finished_books", [])
 
-
 @app.post("/finished-books")
-def add_finished_book(payload: dict):
+def api_add_finished_book(payload: dict):
     books = get_state("finished_books", [])
     books.insert(0, payload)
     set_state("finished_books", books)
     return books
 
 @app.delete("/finished-books/{book_id}")
-@app.delete("/finished-books/{book_id}")
-def delete_finished_book(book_id: str):
+def api_delete_finished_book(book_id: str):
     books = get_state("finished_books", [])
-
     new_books = []
     removed = False
 
@@ -218,11 +168,9 @@ def delete_finished_book(book_id: str):
     return {"ok": True}
 
 
-# ========= CROCHET (SERVER) =========
-from pydantic import BaseModel
-from typing import Optional, List
-from uuid import uuid4
-
+# =========================
+# CROCHET (Postgres table)
+# =========================
 class CrochetCreate(BaseModel):
     title: str
     notes: Optional[str] = ""
@@ -231,22 +179,18 @@ class CrochetCreate(BaseModel):
 class CrochetItem(CrochetCreate):
     id: str
 
-# crochet_db: List[CrochetItem] = []
 
-
-
-@app.get("/crochet", response_model=list[CrochetItem])
+@app.get("/crochet", response_model=List[CrochetItem])
 def list_crochet():
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, title, notes, status FROM crochet ORDER BY rowid DESC")
+            cur.execute("SELECT id, title, notes, status FROM crochet ORDER BY id DESC")
             rows = cur.fetchall()
 
     return [
         CrochetItem(id=r[0], title=r[1], notes=r[2] or "", status=r[3])
         for r in rows
     ]
-
 
 
 @app.post("/crochet", response_model=CrochetItem)
@@ -256,7 +200,7 @@ def add_crochet(payload: CrochetCreate):
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO crochet (id, title, notes, status) VALUES (%s, %s, %s, %s)",
-                (item_id, payload.title, payload.notes or "", payload.status),
+                (item_id, payload.title, payload.notes or "", payload.status or "wip"),
             )
         conn.commit()
 
@@ -264,7 +208,7 @@ def add_crochet(payload: CrochetCreate):
         id=item_id,
         title=payload.title,
         notes=payload.notes or "",
-        status=payload.status,
+        status=payload.status or "wip",
     )
 
 
@@ -280,7 +224,9 @@ def toggle_crochet(item_id: str):
             if not row:
                 raise HTTPException(status_code=404, detail="Crochet item not found")
 
-            new_status = "done" if row[2] != "done" else "wip"
+            title, notes, status = row
+            new_status = "done" if status != "done" else "wip"
+
             cur.execute(
                 "UPDATE crochet SET status = %s WHERE id = %s",
                 (new_status, item_id),
@@ -289,11 +235,10 @@ def toggle_crochet(item_id: str):
 
     return CrochetItem(
         id=item_id,
-        title=row[0],
-        notes=row[1] or "",
+        title=title,
+        notes=notes or "",
         status=new_status,
     )
-
 
 
 @app.delete("/crochet/{item_id}")
