@@ -127,10 +127,10 @@ def root():
 # =========================
 # BOOKS (state table)
 # =========================
-@app.get("/current-book")
-def api_get_current_book():
-    # {} por defecto
-    return get_state("current_book", {})
+@app.get("/current-book", response_model=dict)
+def get_current_book():
+    return get_state("current_book", {"title": ""})
+
 
 @app.post("/current-book")
 def api_set_current_book(payload: dict):
