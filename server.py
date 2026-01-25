@@ -1,61 +1,32 @@
+import os
+import json
+from typing import Any, Optional
+
+import psycopg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Any, Optional, List
-import os
-import json
-import psycopg
 from uuid import uuid4
 
-
-# =========================
-# CONFIG
-# =========================
+# ========= DB =========
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "https://magnificent-panda-edbec6.netlify.app",
-    # opcional si tienes otro deploy viejo:
-    "https://luxury-begonia-2136b4.netlify.app",
-]
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# =========================
-# DB helpers (Postgres / Supabase)
-# =========================
 def get_conn():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL no está configurada")
     return psycopg.connect(DATABASE_URL)
 
-
-def init_state_table():
+def init_tables():
     with get_conn() as conn:
         with conn.cursor() as cur:
+            # Estado (guardamos JSON para current_book y finished_books)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS state (
                     key TEXT PRIMARY KEY,
                     value JSONB NOT NULL
                 )
             """)
-        conn.commit()
-
-
-def init_crochet_table():
-    with get_conn() as conn:
-        with conn.cursor() as cur:
+            # Crochet
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS crochet (
                     id TEXT PRIMARY KEY,
@@ -66,24 +37,6 @@ def init_crochet_table():
             """)
         conn.commit()
 
-
-@app.on_event("startup")
-def on_startup():
-    """
-    Importante: NO queremos que Render se caiga si la DB falla.
-    Si falla, el server arranca igual y lo vemos en logs.
-    """
-    try:
-        init_state_table()
-    except Exception as e:
-        print("⚠️ init_state_table failed:", e)
-
-    try:
-        init_crochet_table()
-    except Exception as e:
-        print("⚠️ init_crochet_table failed:", e)
-
-
 def get_state(key: str, default: Any):
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -92,7 +45,6 @@ def get_state(key: str, default: Any):
     if not row:
         return default
     return json.loads(row[0])
-
 
 def set_state(key: str, value: Any):
     with get_conn() as conn:
@@ -107,13 +59,32 @@ def set_state(key: str, value: Any):
             )
         conn.commit()
 
+# ========= APP =========
+app = FastAPI()
 
-# =========================
-# BASIC endpoints
-# =========================
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "https://magnificent-panda-edbec6.netlify.app",
+    "https://luxury-begonia-2136b4.netlify.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("startup")
+def startup():
+    # Importante: inicializamos tablas al arrancar
+    init_tables()
+
 @app.get("/ping")
 def ping():
-    return {"ok": True, "msg": "pong 💜", "version": "2026-01-25"}
+    return {"ok": True, "msg": "pong 💜"}
 
 @app.get("/marker")
 def marker():
@@ -123,75 +94,65 @@ def marker():
 def root():
     return {"ok": True, "msg": "Lilazul API online 💜"}
 
+# ========= CURRENT BOOK =========
+class CurrentBook(BaseModel):
+    title: str
 
-# =========================
-# BOOKS (state table)
-# =========================
-@app.get("/current-book", response_model=dict)
+@app.get("/current-book")
 def get_current_book():
-    return get_state("current_book", {"title": ""})
-
+    return get_state("current_book", {})
 
 @app.post("/current-book")
-def api_set_current_book(payload: dict):
-    set_state("current_book", payload)
-    # devolvemos lo que guardamos (así lo ves en Swagger)
-    return payload
+def set_current_book(payload: CurrentBook):
+    data = payload.model_dump()
+    set_state("current_book", data)
+    return data
+
+# ========= FINISHED BOOKS =========
+class FinishedBook(BaseModel):
+    id: Optional[str] = None
+    title: str
+    date: str
 
 @app.get("/finished-books")
-def api_list_finished_books():
+def list_finished_books():
     return get_state("finished_books", [])
 
 @app.post("/finished-books")
-def api_add_finished_book(payload: dict):
+def add_finished_book(payload: FinishedBook):
     books = get_state("finished_books", [])
-    books.insert(0, payload)
+    item = payload.model_dump()
+    if not item.get("id"):
+        item["id"] = str(uuid4())
+    books.insert(0, item)
     set_state("finished_books", books)
     return books
 
 @app.delete("/finished-books/{book_id}")
-def api_delete_finished_book(book_id: str):
+def delete_finished_book(book_id: str):
     books = get_state("finished_books", [])
-    new_books = []
-    removed = False
-
-    for b in books:
-        if str(b.get("id")) == str(book_id):
-            removed = True
-            continue
-        new_books.append(b)
-
-    if not removed:
+    new_books = [b for b in books if str(b.get("id")) != str(book_id)]
+    if len(new_books) == len(books):
         raise HTTPException(status_code=404, detail="Book not found")
-
     set_state("finished_books", new_books)
     return {"ok": True}
 
-
-# =========================
-# CROCHET (Postgres table)
-# =========================
+# ========= CROCHET =========
 class CrochetCreate(BaseModel):
     title: str
     notes: Optional[str] = ""
-    status: Optional[str] = "wip"  # "wip" o "done"
+    status: Optional[str] = "wip"  # wip/done
 
 class CrochetItem(CrochetCreate):
     id: str
 
-
-@app.get("/crochet", response_model=List[CrochetItem])
+@app.get("/crochet", response_model=list[CrochetItem])
 def list_crochet():
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT id, title, notes, status FROM crochet ORDER BY id DESC")
             rows = cur.fetchall()
-
-    return [
-        CrochetItem(id=r[0], title=r[1], notes=r[2] or "", status=r[3])
-        for r in rows
-    ]
-
+    return [CrochetItem(id=r[0], title=r[1], notes=r[2] or "", status=r[3]) for r in rows]
 
 @app.post("/crochet", response_model=CrochetItem)
 def add_crochet(payload: CrochetCreate):
@@ -203,43 +164,20 @@ def add_crochet(payload: CrochetCreate):
                 (item_id, payload.title, payload.notes or "", payload.status or "wip"),
             )
         conn.commit()
-
-    return CrochetItem(
-        id=item_id,
-        title=payload.title,
-        notes=payload.notes or "",
-        status=payload.status or "wip",
-    )
-
+    return CrochetItem(id=item_id, title=payload.title, notes=payload.notes or "", status=payload.status or "wip")
 
 @app.patch("/crochet/{item_id}/toggle", response_model=CrochetItem)
 def toggle_crochet(item_id: str):
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT title, notes, status FROM crochet WHERE id = %s",
-                (item_id,),
-            )
+            cur.execute("SELECT title, notes, status FROM crochet WHERE id = %s", (item_id,))
             row = cur.fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="Crochet item not found")
-
-            title, notes, status = row
-            new_status = "done" if status != "done" else "wip"
-
-            cur.execute(
-                "UPDATE crochet SET status = %s WHERE id = %s",
-                (new_status, item_id),
-            )
+            new_status = "done" if row[2] != "done" else "wip"
+            cur.execute("UPDATE crochet SET status = %s WHERE id = %s", (new_status, item_id))
         conn.commit()
-
-    return CrochetItem(
-        id=item_id,
-        title=title,
-        notes=notes or "",
-        status=new_status,
-    )
-
+    return CrochetItem(id=item_id, title=row[0], notes=row[1] or "", status=new_status)
 
 @app.delete("/crochet/{item_id}")
 def delete_crochet(item_id: str):
@@ -248,10 +186,8 @@ def delete_crochet(item_id: str):
             cur.execute("DELETE FROM crochet WHERE id = %s", (item_id,))
             deleted = cur.rowcount
         conn.commit()
-
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Crochet item not found")
-
     return {"ok": True}
 
 
