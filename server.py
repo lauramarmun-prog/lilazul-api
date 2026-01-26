@@ -1,13 +1,20 @@
-import json
 import os
-from typing import Any, Dict, Optional
-from uuid import uuid4
+import json
+from typing import Any, Optional
+
+
 
 import psycopg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from supabase import Client, create_client
+from uuid import uuid4
+
+import os
+from typing import Optional, Dict, Any
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from supabase import create_client, Client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
@@ -26,7 +33,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL no esta configurada")
+        raise RuntimeError("DATABASE_URL no está configurada")
     return psycopg.connect(DATABASE_URL)
 
 def init_tables():
@@ -72,10 +79,13 @@ def set_state(key: str, value: Any):
             )
         conn.commit()
 
+
 # ========= APP =========
 app = FastAPI()
 
+
 ALLOWED_ORIGINS = [
+    ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
     "http://localhost:5173",
@@ -84,7 +94,8 @@ ALLOWED_ORIGINS = [
     "https://luxury-begonia-2136b4.netlify.app",
 ]
 
-app.add_middleware(
+
+aapp.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
@@ -99,7 +110,7 @@ def startup():
 
 @app.get("/ping")
 def ping():
-    return {"ok": True, "msg": "pong"}
+    return {"ok": True, "msg": "pong 💜"}
 
 @app.get("/marker")
 def marker():
@@ -107,7 +118,7 @@ def marker():
 
 @app.get("/")
 def root():
-    return {"ok": True, "msg": "Lilazul API online"}
+    return {"ok": True, "msg": "Lilazul API online 💜"}
 
 # ========= CURRENT BOOK =========
 class CurrentBook(BaseModel):
@@ -179,12 +190,7 @@ def add_crochet(payload: CrochetCreate):
                 (item_id, payload.title, payload.notes or "", payload.status or "wip"),
             )
         conn.commit()
-    return CrochetItem(
-        id=item_id,
-        title=payload.title,
-        notes=payload.notes or "",
-        status=payload.status or "wip",
-    )
+    return CrochetItem(id=item_id, title=payload.title, notes=payload.notes or "", status=payload.status or "wip")
 
 @app.patch("/crochet/{item_id}/toggle", response_model=CrochetItem)
 def toggle_crochet(item_id: str):
@@ -218,26 +224,19 @@ class CakeIn(BaseModel):
 
 @app.get("/cake")
 def cake_get(month: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Devuelve:
-    - si pasas ?month=YYYY-MM -> ese mes
-    - si NO pasas month -> la mas reciente (por month desc)
-    """
-    q = _db().table("cakes").select("id,month,name,note,photo_url,updated_at,created_at")
+    q = _db().table("cakes").select("id,month,name,note,photo_url")
+
     if month:
         res = q.eq("month", month).limit(1).execute()
         data = res.data or []
         return {"ok": True, "cake": (data[0] if data else None)}
-    # la mas reciente por month (text YYYY-MM ordena bien)
-    res = q.order("month", desc=True).limit(1).execute()
-    data = res.data or []
-    return {"ok": True, "cake": (data[0] if data else None)}
+    else:
+        res = q.order("month", desc=True).limit(1).execute()
+        data = res.data or []
+        return {"ok": True, "cake": (data[0] if data else None)}
 
 @app.put("/cake")
 def cake_put(payload: CakeIn) -> Dict[str, Any]:
-    """
-    Upsert por month (como lo pusiste Unique en Supabase).
-    """
     try:
         res = _db().table("cakes").upsert(
             {
@@ -248,7 +247,17 @@ def cake_put(payload: CakeIn) -> Dict[str, Any]:
             },
             on_conflict="month",
         ).execute()
+
         data = res.data or []
-        return {"ok": True, "cake": (data[0] if data else None)}
+        if data:
+            return {"ok": True, "cake": data[0]}
+
+        # fallback: volver a leer por month
+        read = _db().table("cakes").select("id,month,name,note,photo_url").eq("month", payload.month).limit(1).execute()
+        rows = read.data or []
+        return {"ok": True, "cake": (rows[0] if rows else None)}
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
