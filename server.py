@@ -1,19 +1,32 @@
-import os
 import json
-from typing import Any, Optional
+import os
+from typing import Any, Dict, Optional
+from uuid import uuid4
 
 import psycopg
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from uuid import uuid4
+from supabase import Client, create_client
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+sb: Optional[Client] = None
+if SUPABASE_URL and SUPABASE_KEY:
+    sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def _db() -> Client:
+    if sb is None:
+        raise RuntimeError("Supabase not configured")
+    return sb
 
 # ========= DB =========
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
     if not DATABASE_URL:
-        raise RuntimeError("DATABASE_URL no está configurada")
+        raise RuntimeError("DATABASE_URL no esta configurada")
     return psycopg.connect(DATABASE_URL)
 
 def init_tables():
@@ -65,6 +78,8 @@ app = FastAPI()
 ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    "http://localhost:5173",
+    "http://localhost:3000",
     "https://magnificent-panda-edbec6.netlify.app",
     "https://luxury-begonia-2136b4.netlify.app",
 ]
@@ -72,7 +87,7 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -84,7 +99,7 @@ def startup():
 
 @app.get("/ping")
 def ping():
-    return {"ok": True, "msg": "pong 💜"}
+    return {"ok": True, "msg": "pong"}
 
 @app.get("/marker")
 def marker():
@@ -92,7 +107,7 @@ def marker():
 
 @app.get("/")
 def root():
-    return {"ok": True, "msg": "Lilazul API online 💜"}
+    return {"ok": True, "msg": "Lilazul API online"}
 
 # ========= CURRENT BOOK =========
 class CurrentBook(BaseModel):
@@ -164,7 +179,12 @@ def add_crochet(payload: CrochetCreate):
                 (item_id, payload.title, payload.notes or "", payload.status or "wip"),
             )
         conn.commit()
-    return CrochetItem(id=item_id, title=payload.title, notes=payload.notes or "", status=payload.status or "wip")
+    return CrochetItem(
+        id=item_id,
+        title=payload.title,
+        notes=payload.notes or "",
+        status=payload.status or "wip",
+    )
 
 @app.patch("/crochet/{item_id}/toggle", response_model=CrochetItem)
 def toggle_crochet(item_id: str):
@@ -190,5 +210,45 @@ def delete_crochet(item_id: str):
         raise HTTPException(status_code=404, detail="Crochet item not found")
     return {"ok": True}
 
+class CakeIn(BaseModel):
+    month: str  # "YYYY-MM"
+    name: str = ""
+    note: str = ""
+    photo_url: str = ""
 
+@app.get("/cake")
+def cake_get(month: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Devuelve:
+    - si pasas ?month=YYYY-MM -> ese mes
+    - si NO pasas month -> la mas reciente (por month desc)
+    """
+    q = _db().table("cakes").select("id,month,name,note,photo_url,updated_at,created_at")
+    if month:
+        res = q.eq("month", month).limit(1).execute()
+        data = res.data or []
+        return {"ok": True, "cake": (data[0] if data else None)}
+    # la mas reciente por month (text YYYY-MM ordena bien)
+    res = q.order("month", desc=True).limit(1).execute()
+    data = res.data or []
+    return {"ok": True, "cake": (data[0] if data else None)}
 
+@app.put("/cake")
+def cake_put(payload: CakeIn) -> Dict[str, Any]:
+    """
+    Upsert por month (como lo pusiste Unique en Supabase).
+    """
+    try:
+        res = _db().table("cakes").upsert(
+            {
+                "month": payload.month,
+                "name": payload.name or "",
+                "note": payload.note or "",
+                "photo_url": payload.photo_url or "",
+            },
+            on_conflict="month",
+        ).execute()
+        data = res.data or []
+        return {"ok": True, "cake": (data[0] if data else None)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
