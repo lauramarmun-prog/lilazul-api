@@ -251,7 +251,7 @@ class CakeIn(BaseModel):
     name: str = ""
     note: str = ""
     photo_url: str = ""
-
+    recipe: str = ""   
 
 @app.get("/cake")
 def cake_get(month: Optional[str] = None) -> Dict[str, Any]:
@@ -271,6 +271,23 @@ def cake_get(month: Optional[str] = None) -> Dict[str, Any]:
         # Esto hará que Swagger te muestre el error REAL (permissions, table missing, etc.)
         raise HTTPException(status_code=500, detail=f"/cake GET failed: {e}")
 
+@app.get("/cakes")
+def cakes_list(limit: int = 50) -> Dict[str, Any]:
+    """
+    Historial de tartas (más recientes primero).
+    """
+    try:
+        res = (
+            _db()
+            .table("cakes")
+            .select("id,month,name,note,photo_url,recipe,created_at,updated_at")
+            .order("month", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return {"ok": True, "items": res.data or []}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/cake")
 def cake_put(payload: CakeIn) -> Dict[str, Any]:
@@ -281,6 +298,7 @@ def cake_put(payload: CakeIn) -> Dict[str, Any]:
                 "name": payload.name or "",
                 "note": payload.note or "",
                 "photo_url": payload.photo_url or "",
+                "recipe": payload.recipe or "",   # NUEVO
             },
             on_conflict="month",
         ).execute()
@@ -289,13 +307,19 @@ def cake_put(payload: CakeIn) -> Dict[str, Any]:
         if data:
             return {"ok": True, "cake": data[0]}
 
-        # fallback: volver a leer por month
-        read = _db().table("cakes").select("id,month,name,note,photo_url").eq("month", payload.month).limit(1).execute()
+        read = (
+            _db()
+            .table("cakes")
+            .select("id,month,name,note,photo_url,recipe")
+            .eq("month", payload.month)
+            .limit(1)
+            .execute()
+        )
         rows = read.data or []
         return {"ok": True, "cake": (rows[0] if rows else None)}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"/cake PUT failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 
