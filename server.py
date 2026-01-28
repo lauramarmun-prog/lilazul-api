@@ -253,6 +253,14 @@ class CakeIn(BaseModel):
     photo_url: str = ""
     recipe: str = ""   
 
+@app.delete("/cakes/{cake_id}")
+def cake_delete(cake_id: str):
+    res = sb.table("cakes").delete().eq("id", cake_id).execute()
+    # Si supabase devuelve data vacía, puede que no existiera
+    if not getattr(res, "data", None):
+        raise HTTPException(status_code=404, detail="Cake not found")
+    return {"ok": True}
+
 @app.get("/cake")
 def cake_get(month: Optional[str] = None) -> Dict[str, Any]:
     try:
