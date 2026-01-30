@@ -10,6 +10,9 @@ from pydantic import BaseModel
 
 from supabase import create_client, Client
 
+class MoodUpdate(BaseModel):
+    mood: str
+
 
 # =======================
 # Supabase
