@@ -32,20 +32,6 @@ def _db() -> Client:
         raise HTTPException(status_code=500, detail="Supabase not configured (missing SUPABASE_URL / SUPABASE_*_KEY)")
     return sb
 
-def _sb_headers():
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
-    return {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-        "Content-Type": "application/json",
-    }
-
-def _sb_rest_url(path: str) -> str:
-    if not SUPABASE_URL:
-        raise RuntimeError("Missing SUPABASE_URL")
-    return f"{SUPABASE_URL}/rest/v1/{path.lstrip('/')}"
-
 
 # =======================
 # Render Postgres (state + crochet)
@@ -350,20 +336,17 @@ def cake_put(payload: CakeIn) -> Dict[str, Any]:
 # Mood (Supabase)
 # =======================
 
-
 @app.get("/moods")
-async def get_moods():
-    url = _sb_rest_url("mood?select=owner,mood,updated_at")
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.get(url, headers=_sb_headers())
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
+def get_moods():
+    db = _db()
 
-    rows = r.json()
+    res = db.table("mood").select("owner,mood,updated_at").execute()
+    rows = res.data or []
+
     out = {"lau": "", "geppie": "", "lau_updated_at": None, "geppie_updated_at": None}
 
     for row in rows:
-        owner = (row.get("owner") or "").lower()
+        owner = (row.get("owner") or "").strip().lower()
         if owner in ("lau", "geppie"):
             out[owner] = row.get("mood") or ""
             out[f"{owner}_updated_at"] = row.get("updated_at")
@@ -371,38 +354,20 @@ async def get_moods():
     return out
 
 @app.put("/moods/lau")
-async def set_lau_mood(payload: MoodUpdate):
+def set_lau_mood(payload: MoodUpdate):
+    db = _db()
     mood = (payload.mood or "").strip()
 
-    # update row
-    url = _sb_rest_url("mood?owner=eq.lau")
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.patch(
-            url,
-            headers={**_sb_headers(), "Prefer": "return=representation"},
-            json={"mood": mood},
-        )
-
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
-
+    db.table("mood").update({"mood": mood}).eq("owner", "lau").execute()
     return {"ok": True, "owner": "lau", "mood": mood}
 
 @app.put("/moods/geppie")
-async def set_geppie_mood(payload: MoodUpdate):
+def set_geppie_mood(payload: MoodUpdate):
+    db = _db()
     mood = (payload.mood or "").strip()
 
-    url = _sb_rest_url("mood?owner=eq.geppie")
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        r = await client.patch(
-            url,
-            headers={**_sb_headers(), "Prefer": "return=representation"},
-            json={"mood": mood},
-        )
-
-    if r.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
-
+    db.table("mood").update({"mood": mood}).eq("owner", "geppie").execute()
     return {"ok": True, "owner": "geppie", "mood": mood}
+
 
 
