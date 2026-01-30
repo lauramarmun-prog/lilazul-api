@@ -31,6 +31,20 @@ def _db() -> Client:
         raise HTTPException(status_code=500, detail="Supabase not configured (missing SUPABASE_URL / SUPABASE_*_KEY)")
     return sb
 
+def _sb_headers():
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+def _sb_rest_url(path: str) -> str:
+    if not SUPABASE_URL:
+        raise RuntimeError("Missing SUPABASE_URL")
+    return f"{SUPABASE_URL}/rest/v1/{path.lstrip('/')}"
+
 
 # =======================
 # Render Postgres (state + crochet)
