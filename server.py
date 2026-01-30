@@ -328,6 +328,63 @@ def cake_put(payload: CakeIn) -> Dict[str, Any]:
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+# =======================
+# Mood (Supabase)
+# =======================
 
+
+@app.get("/moods")
+async def get_moods():
+    url = _sb_rest_url("mood?select=owner,mood,updated_at")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.get(url, headers=_sb_headers())
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
+
+    rows = r.json()
+    out = {"lau": "", "geppie": "", "lau_updated_at": None, "geppie_updated_at": None}
+
+    for row in rows:
+        owner = (row.get("owner") or "").lower()
+        if owner in ("lau", "geppie"):
+            out[owner] = row.get("mood") or ""
+            out[f"{owner}_updated_at"] = row.get("updated_at")
+
+    return out
+
+@app.put("/moods/lau")
+async def set_lau_mood(payload: MoodUpdate):
+    mood = (payload.mood or "").strip()
+
+    # update row
+    url = _sb_rest_url("mood?owner=eq.lau")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.patch(
+            url,
+            headers={**_sb_headers(), "Prefer": "return=representation"},
+            json={"mood": mood},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
+
+    return {"ok": True, "owner": "lau", "mood": mood}
+
+@app.put("/moods/geppie")
+async def set_geppie_mood(payload: MoodUpdate):
+    mood = (payload.mood or "").strip()
+
+    url = _sb_rest_url("mood?owner=eq.geppie")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        r = await client.patch(
+            url,
+            headers={**_sb_headers(), "Prefer": "return=representation"},
+            json={"mood": mood},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail=f"Supabase error: {r.text}")
+
+    return {"ok": True, "owner": "geppie", "mood": mood}
 
 
